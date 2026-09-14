@@ -11,7 +11,8 @@ jobs:
     if: vars.SUPABASE_URL != ''
     runs-on: ubuntu-latest
     steps:
-      - run: curl -fsS "$URL/rest/v1/games?select=id&limit=1" -H "apikey: $KEY" > /dev/null
+      - run: |
+          curl -fsS "$URL/rest/v1/games?select=id&limit=1" -H "apikey: $KEY" > /dev/null
         env:
           URL: ${{ vars.SUPABASE_URL }}
           KEY: ${{ vars.SUPABASE_KEY }}
