@@ -1,0 +1,17 @@
+# Supabase pauses free projects after a week without activity; a tiny read every 3 days keeps the gallery up.
+name: Keep Supabase awake
+
+on:
+  schedule:
+    - cron: '0 6 */3 * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    if: vars.SUPABASE_URL != ''
+    runs-on: ubuntu-latest
+    steps:
+      - run: curl -fsS "$URL/rest/v1/games?select=id&limit=1" -H "apikey: $KEY" > /dev/null
+        env:
+          URL: ${{ vars.SUPABASE_URL }}
+          KEY: ${{ vars.SUPABASE_KEY }}

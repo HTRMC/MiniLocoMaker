@@ -1,0 +1,37 @@
+<script lang="ts">
+  import { mount } from './lib/engine.js';
+  import { exportGame, FORMATS, type Format } from './lib/export';
+  import { ui, t } from './lib/i18n.svelte';
+  import type { Game } from './lib/types';
+
+  let { game }: { game: Game } = $props();
+  let el: HTMLDivElement;
+  let handle: ReturnType<typeof mount>;
+  let fmt = $state<Format>('pdf'), busy = $state(false), err = $state('');
+
+  $effect(() => { handle = mount(el, game, { lang: ui.lang }); });
+
+  async function download() {
+    busy = true;
+    err = '';
+    try {
+      await exportGame(fmt, $state.snapshot(game), handle.sheet(), handle.lang());
+    } catch (e) {
+      err = `${t('error')}: ${(e as Error).message}`;
+    }
+    busy = false;
+  }
+</script>
+
+<div class="card">
+  <div bind:this={el}></div>
+  <div class="toolbar">
+    <label class="inline">{t('exportAs')}
+      <select bind:value={fmt}>
+        {#each FORMATS as f}<option value={f}>{f.toUpperCase()}</option>{/each}
+      </select>
+    </label>
+    <button onclick={download} disabled={busy}>⬇ {t('download')}</button>
+    {#if err}<span class="err">{err}</span>{/if}
+  </div>
+</div>
