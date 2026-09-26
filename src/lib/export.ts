@@ -1,5 +1,5 @@
 import engineSrc from './engine.js?raw';
-import { tr, W, H } from './engine.js';
+import { tr } from './engine.js';
 import type { Game } from './types';
 
 export const FORMATS = ['pdf', 'svg', 'png', 'jpeg', 'webp', 'html', 'json'] as const;
@@ -13,7 +13,14 @@ function save(blob: Blob, name: string) {
   setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
 }
 
+/** Width and height of an SVG string from its viewBox. */
+function size(svg: string): [number, number] {
+  const [, w, h] = svg.match(/viewBox="0 0 ([\d.]+) ([\d.]+)"/)!;
+  return [+w, +h];
+}
+
 async function raster(svg: string, type: string, scale = 3): Promise<Blob> {
+  const [W, H] = size(svg);
   const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
   try {
     const img = new Image();
@@ -33,7 +40,8 @@ async function raster(svg: string, type: string, scale = 3): Promise<Blob> {
 
 async function pdf(svg: string): Promise<Blob> {
   const [{ jsPDF }] = await Promise.all([import('jspdf'), import('svg2pdf.js')]);
-  const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+  const [W, H] = size(svg);
+  const doc = new jsPDF({ orientation: W > H ? 'landscape' : 'portrait', unit: 'pt', format: 'a4' });
   const holder = document.createElement('div'); // svg2pdf needs the SVG in the document for computed styles
   holder.style.cssText = 'position:fixed;left:-10000px;top:0';
   holder.innerHTML = svg;

@@ -125,11 +125,26 @@ const tf = (x, y, size) => `translate(${x} ${y}) scale(${size / 100})`;
 /** @param {number} n */
 const back = n => { const b = backOf(n); return `<rect width="100" height="100" fill="#FFF8DC"/><polygon points="${b.shape}" fill="${b.color}"/>`; };
 
+/** Small tile n with its label; play = draggable with a hidden back side. */
+function tile(/** @type {any} */ game, /** @type {number} */ k, /** @type {number} */ n, /** @type {number} */ x, /** @type {number} */ y, /** @type {number} */ s, play = false) {
+  const label = String(game.items[k]?.label ?? '');
+  return `<g${play ? ` class="t" data-n="${n}"` : ''} transform="${tf(x, y, s)}"${play ? ' style="cursor:grab"' : ''}><g clip-path="url(#mlm-clip)">` +
+    `<g class="f"><rect width="100" height="100" fill="#fff8e6"/>${block(label, 50, 54, 86, 70, 64, RED)}` +
+    `<text x="8" y="20" font-size="15" font-weight="bold" fill="${MUTED}">${n + 1}</text></g>` +
+    (play ? `<g class="b" display="none">${back(n)}</g>` : '') +
+    `</g><rect x="1" y="1" width="98" height="98" rx="9" fill="none" stroke="#94a3b8" stroke-width="2"/></g>`;
+}
+
+/** Answer slot s (blue box) with its answer. */
+const slot = (/** @type {any} */ game, /** @type {{items: number[], solution: number[]}} */ d, /** @type {string} */ lang, /** @type {number} */ s, /** @type {number} */ x, /** @type {number} */ y, /** @type {number} */ size) =>
+  `<rect x="${x + 3}" y="${y + 3}" width="${size - 6}" height="${size - 6}" rx="12" fill="#edf2ff" stroke="#bac8ff" stroke-width="2"/>` +
+  block(tr(game.items[d.items[d.solution[s]]], lang), x + size / 2, y + size / 2, size - 18, size - 18, 26 * size / 125, INK);
+
 /**
- * Board as an SVG string. sheet = printable worksheet (no hint, no back sides, with the solution pattern).
+ * Playable board as an SVG string.
  * @param {any} game @param {{items: number[], solution: number[]}} d @param {string} lang
  */
-export function render(game, d, lang, sheet = false) {
+export function render(game, d, lang) {
   const L = lang === 'nl' ? UI.nl : UI.en, img = esc(game.image || '');
   const out = [
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" font-family="${FONT}">`,
@@ -139,34 +154,15 @@ export function render(game, d, lang, sheet = false) {
     `<rect x="${M}" y="45" width="${IMG}" height="${IMG}" rx="12" fill="${SOFT}" stroke="${LINE}" stroke-width="2"/>`,
   ];
   if (img) out.push(`<image id="mlm-img" class="img" x="${M}" y="45" width="${IMG}" height="${IMG}" href="${img}" preserveAspectRatio="xMidYMid meet" style="cursor:zoom-in"/>`);
-  if (!sheet) out.push(line(L.hint, SRC.x, 62, 6 * SRC.s, 12, 'normal', MUTED));
+  out.push(line(L.hint, SRC.x, 62, 6 * SRC.s, 12, 'normal', MUTED));
   for (let n = 0; n < 12; n++) out.push(`<rect x="${SRC.x + (n % 6) * SRC.s + 4}" y="${SRC.y + Math.floor(n / 6) * SRC.s + 4}" width="${SRC.s - 8}" height="${SRC.s - 8}" rx="8" fill="${SOFT}" stroke="${LINE}" stroke-width="2" stroke-dasharray="5 4"/>`);
   out.push(line(tr(game.question, lang), M, 328, W - 2 * M, 20));
 
-  d.solution.forEach((n, s) => {
-    const x = DST.x + (s % 6) * DST.s, y = DST.y + Math.floor(s / 6) * DST.s;
-    out.push(`<rect x="${x + 3}" y="${y + 3}" width="${DST.s - 6}" height="${DST.s - 6}" rx="12" fill="#edf2ff" stroke="#bac8ff" stroke-width="2"/>`,
-      block(tr(game.items[d.items[n]], lang), x + DST.s / 2, y + DST.s / 2, DST.s - 18, DST.s - 18, 26, INK));
-  });
+  for (let s = 0; s < 12; s++) out.push(slot(game, d, lang, s, DST.x + (s % 6) * DST.s, DST.y + Math.floor(s / 6) * DST.s, DST.s));
 
-  if (sheet) { // solution pattern with rows swapped: the physical box is flipped over to check
-    const kx = SRC.x + 6 * SRC.s - 108;
-    out.push(line(L.key, kx, 246, 108, 11, 'normal'));
-    d.solution.forEach((n, s) => {
-      out.push(`<g transform="${tf(kx + (s % 6) * 18, 252 + (s < 6 ? 18 : 0), 18)}">${back(n)}<rect width="100" height="100" fill="none" stroke="${MUTED}" stroke-width="4"/></g>`);
-    });
-  }
+  d.items.forEach((k, n) => out.push(tile(game, k, n, SRC.x + (n % 6) * SRC.s, SRC.y + Math.floor(n / 6) * SRC.s, SRC.s, true)));
 
-  d.items.forEach((k, n) => {
-    const label = String(game.items[k]?.label ?? '');
-    out.push(`<g class="t" data-n="${n}" transform="${tf(SRC.x + (n % 6) * SRC.s, SRC.y + Math.floor(n / 6) * SRC.s, SRC.s)}" style="cursor:grab"><g clip-path="url(#mlm-clip)">`,
-      `<g class="f"><rect width="100" height="100" fill="#fff8e6"/>${block(label, 50, 54, 86, 70, 64, RED)}`,
-      `<text x="8" y="20" font-size="15" font-weight="bold" fill="${MUTED}">${n + 1}</text></g>`,
-      sheet ? '' : `<g class="b" display="none">${back(n)}</g>`,
-      `</g><rect x="1" y="1" width="98" height="98" rx="9" fill="none" stroke="#94a3b8" stroke-width="2"/></g>`);
-  });
-
-  if (!sheet && img) { // enlarged image overlay
+  if (img) { // enlarged image overlay
     const s = 570 / IMG;
     out.push(`<g class="zoom" display="none" style="cursor:zoom-out"><rect width="${W}" height="${H}" fill="#000" fill-opacity="0.6"/>`,
       `<use href="#mlm-img" transform="translate(${(W - 570) / 2 - M * s} ${20 - 45 * s}) scale(${s})"/></g>`);
@@ -175,8 +171,48 @@ export function render(game, d, lang, sheet = false) {
   return out.join('');
 }
 
+// Printable worksheet layouts. Sizes are PDF points: the export prints them at scale 1, except classic (the play board, scaled 0.91 onto A4).
+// Portrait layouts are 555 x 802 and landscape ones 802 x 555: A4 minus a 20 pt margin.
+// title/question: [x, baseline, width, font size]; img: [x, y, w, h]; tiles/slots: [x, y, size, columns]; key: [x, y, cell size].
+const BOX = 125 * 555 / 610; // printed size of a classic answer slot, kept by the other layouts where it fits
+export const LAYOUTS = /** @type {const} */ (['classic', 'wide', 'portrait', 'grid']);
+/** @type {Record<string, any>} */
+const SHEETS = {
+  classic: { w: W, h: H, title: [M, 32, W - 2 * M, 22], img: [M, 45, IMG, IMG], tiles: [SRC.x, SRC.y, SRC.s, 6], key: [SRC.x + 6 * SRC.s - 108, 252, 18], question: [M, 328, W - 2 * M, 20], slots: [DST.x, DST.y, DST.s, 6] },
+  wide: { w: 802, h: 555, title: [0, 20, 492, 20], img: [0, 32, 492, 555 - 2 * BOX - 58], tiles: [502, 32, 50, 6], key: [6 * BOX + 6, 555 - 2 * BOX + 20, 18], question: [0, 555 - 2 * BOX - 8, 802, 16], slots: [0, 555 - 2 * BOX, BOX, 6] },
+  portrait: { w: 555, h: 802, title: [0, 20, 555, 20], img: [0, 32, 555, 802 - 555 / 3 - 68 - 42], tiles: [0, 802 - 555 / 3 - 68, 38, 12], key: [470, 802 - 555 / 3 - 58, 14], question: [0, 802 - 555 / 3 - 8, 555, 16], slots: [0, 802 - 555 / 3, 555 / 6, 6] },
+  grid: { w: 555, h: 802, title: [0, 20, 555, 20], img: [0, 32, 555, 802 - 3 * BOX - 58], tiles: [4 * BOX + 14, 802 - 3 * BOX + 4, 42, 2], key: [4 * BOX + 14, 802 - 3 * BOX + 276, 14], question: [0, 802 - 3 * BOX - 8, 555, 16], slots: [0, 802 - 3 * BOX, BOX, 4] },
+};
+
 /**
- * Playable game inside root. Returns the current worksheet SVG for exports.
+ * Printable worksheet as an SVG string: no hint, no back sides, with the solution pattern.
+ * @param {any} game @param {{items: number[], solution: number[]}} d @param {string} lang @param {string} [layout]
+ */
+export function sheet(game, d, lang, layout = 'classic') {
+  const L = lang === 'nl' ? UI.nl : UI.en, img = esc(game.image || ''), S = SHEETS[layout] || SHEETS.classic;
+  const [ix, iy, iw, ih] = S.img, [tx, ty, ts, tc] = S.tiles, [sx, sy, ss, sc] = S.slots, [kx, ky, ks] = S.key;
+  const out = [
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${S.w} ${S.h}" width="${S.w}" height="${S.h}" font-family="${FONT}">`,
+    `<defs><clipPath id="mlm-clip"><rect width="100" height="100" rx="10"/></clipPath></defs>`,
+    `<rect width="${S.w}" height="${S.h}" fill="#fff"/>`, // opaque ground: JPEG has no transparency
+    line(tr(game.title, lang), S.title[0], S.title[1], S.title[2], S.title[3]),
+    `<rect x="${ix}" y="${iy}" width="${iw}" height="${ih}" rx="12" fill="${SOFT}" stroke="${LINE}" stroke-width="2"/>`,
+  ];
+  if (img) out.push(`<image x="${ix}" y="${iy}" width="${iw}" height="${ih}" href="${img}" preserveAspectRatio="xMidYMid meet"/>`);
+  out.push(line(tr(game.question, lang), S.question[0], S.question[1], S.question[2], S.question[3]));
+  for (let s = 0; s < 12; s++) out.push(slot(game, d, lang, s, sx + (s % sc) * ss, sy + Math.floor(s / sc) * ss, ss));
+  // solution pattern with rows swapped: the physical box is flipped over to check
+  out.push(line(L.key, kx, ky - 6, 6 * ks, 11, 'normal'));
+  d.solution.forEach((n, s) => {
+    out.push(`<g transform="${tf(kx + (s % 6) * ks, ky + (s < 6 ? ks : 0), ks)}">${back(n)}<rect width="100" height="100" fill="none" stroke="${MUTED}" stroke-width="4"/></g>`);
+  });
+  d.items.forEach((k, n) => out.push(tile(game, k, n, tx + (n % tc) * ts, ty + Math.floor(n / tc) * ts, ts)));
+  out.push('</svg>');
+  return out.join('');
+}
+
+/**
+ * Playable game inside root. sheet(layout) returns the current deal as a worksheet SVG for exports.
  * @param {HTMLElement} root @param {any} game @param {{lang?: string}} [opts]
  */
 export function mount(root, game, opts = {}) {
@@ -263,5 +299,5 @@ export function mount(root, game, opts = {}) {
   bLang.onclick = () => { lang = lang === 'nl' ? 'en' : 'nl'; say(); draw(); };
   draw();
 
-  return { sheet: () => render(game, d, lang, true), lang: () => lang };
+  return { sheet: (/** @type {string} */ layout) => sheet(game, d, lang, layout), lang: () => lang };
 }
